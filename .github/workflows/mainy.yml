@@ -1,0 +1,83 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+          python -m pywin32_postinstall -install
+
+      - name: EXE bauen
+        run: |
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name "FreeFlowWindows" `
+            --hidden-import "pystray._win32" `
+            --hidden-import "win32gui" `
+            --hidden-import "win32api" `
+            --hidden-import "win32con" `
+            --hidden-import "win32com" `
+            --hidden-import "win32com.shell" `
+            --hidden-import "win32com.shell.shell" `
+            --hidden-import "sounddevice" `
+            --hidden-import "soundfile" `
+            --collect-data "sounddevice" `
+            --collect-data "soundfile" `
+            --collect-binaries "sounddevice" `
+            freeflow_windows.py
+
+      - name: EXE-Größe prüfen
+        run: |
+          $size = (Get-Item dist\FreeFlowWindows.exe).length / 1MB
+          Write-Host "EXE Größe: $([math]::Round($size, 1)) MB"
+          if ($size -lt 5) {
+            Write-Error "EXE zu klein — Build wahrscheinlich fehlerhaft"
+            exit 1
+          }
+
+      - name: Release erstellen & EXE hochladen
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "FreeFlow Windows ${{ github.ref_name }}"
+          body: |
+            ## 🎙️ FreeFlow Windows ${{ github.ref_name }}
+
+            ### Installation
+            1. `FreeFlowWindows.exe` herunterladen
+            2. Doppelklicken — kein Python, keine Installation nötig
+            3. Kostenlosen Groq API-Key unter [console.groq.com](https://console.groq.com) holen
+            4. Taste wählen, loslegen ✅
+
+            ### Erste Schritte
+            - Taste **halten** → sprechen → **loslassen** → Text erscheint
+            - Standard-Taste: Rechte Strg (in Einstellungen änderbar)
+            - Tray-Icon in der Taskleiste → Einstellungen / Beenden
+
+            ### Hinweis
+            Windows Defender meldet die EXE möglicherweise als unbekannt — normal bei unsignierten EXEs.
+            Einfach: „Weitere Informationen" → „Trotzdem ausführen"
+          files: dist/FreeFlowWindows.exe
+          draft: false
+          prerelease: false
