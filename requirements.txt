@@ -1,0 +1,8 @@
+sounddevice
+numpy
+requests
+keyboard
+pyperclip
+pystray
+Pillow
+pywin32
